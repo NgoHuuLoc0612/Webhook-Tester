@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebhookTester</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%236366f1'/><path d='M7 16L14 9V13H25V19H14V23Z' fill='white'/></svg>">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+
+<!-- ═══ SIDEBAR ═════════════════════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <svg width="34" height="34" viewBox="0 0 34 34"><rect width="34" height="34" rx="9" fill="url(#gr)"/><path d="M8 17L15 10V14H26V20H15V24Z" fill="#fff"/><defs><linearGradient id="gr" x1="0" y1="0" x2="34" y2="34"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#a855f7"/></linearGradient></defs></svg>
+    <div class="brand-text">
+      <div class="brand-name">WebhookTester</div>
+      <div class="brand-version">v3.0</div>
+    </div>
+    <button class="btn-icon" id="btnNew" title="New Endpoint (N)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+  </div>
+
+  <div class="sidebar-search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input id="epSearch" placeholder="Search endpoints… (⌘K)">
+  </div>
+
+  <nav id="epList" class="ep-list"></nav>
+
+  <div class="sidebar-nav">
+    <button class="snav active" data-view="Dashboard" id="navDash">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </button>
+    <button class="snav" data-view="Live" id="navLive">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+      Live Feed
+    </button>
+    <button class="snav" data-view="Security" id="navSec">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Security
+    </button>
+    <button class="snav" data-view="Keys" id="navKeys">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      API Keys
+    </button>
+  </div>
+
+  <div class="sse-status" id="sseStatus">
+    <span class="sse-dot offline" id="sseDot"></span>
+    <span id="sseLabel">Disconnected</span>
+    <span class="sse-count" id="sseCount">0</span>
+  </div>
+</aside>
+
+<!-- ═══ MAIN ══════════════════════════════════════════════════════════════════ -->
+<main class="main" id="main">
+
+  <!-- ─── DASHBOARD ──────────────────────────────────────────────────────── -->
+  <section class="view active" id="viewDashboard">
+    <div class="view-hdr">
+      <h1>Dashboard</h1>
+      <div class="hdr-right">
+        <div class="time-range-picker" id="timeRangePicker">
+          <button class="trp-btn active" data-range="24h">24h</button>
+          <button class="trp-btn" data-range="7d">7d</button>
+          <button class="trp-btn" data-range="30d">30d</button>
+        </div>
+        <button class="btn btn-sm" id="btnRefresh">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-row" id="kpiRow"></div>
+
+    <div class="dash-grid">
+      <div class="card span2">
+        <div class="card-hdr">
+          <h3>Requests / Hour</h3>
+          <span class="card-sub" id="reqRateLabel">—</span>
+        </div>
+        <canvas id="chartHourly" height="140"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><h3>Method Distribution</h3></div>
+        <canvas id="chartMethods" height="140"></canvas>
+      </div>
+      <div class="card span2">
+        <div class="card-hdr">
+          <h3>7-Day Traffic</h3>
+          <div style="display:flex;gap:10px;font-size:10px">
+            <span style="color:var(--accent)">■ Requests</span>
+            <span style="color:var(--danger)">■ Blocked</span>
+          </div>
+        </div>
+        <canvas id="chartWeekly" height="140"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><h3>Content Types</h3></div>
+        <canvas id="chartContent" height="140"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><h3>Payload Sizes</h3></div>
+        <canvas id="chartSizes" height="140"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><h3>Avg Duration Trend</h3></div>
+        <canvas id="chartDuration" height="140"></canvas>
+      </div>
+      <div class="card span3">
+        <div class="card-hdr"><h3>Top Endpoints</h3></div>
+        <table class="dtable" id="topEpTable">
+          <thead><tr><th>Endpoint</th><th>Requests</th><th>Blocked</th><th>Block Rate</th><th>Data</th><th>Last Hit</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── ENDPOINT VIEW ───────────────────────────────────────────────────── -->
+  <section class="view" id="viewEndpoint">
+    <div class="view-hdr">
+      <div class="ep-hdr-left">
+        <div class="ep-color-dot" id="epDot"></div>
+        <h1 id="epTitle">Endpoint</h1>
+        <span class="ep-badge" id="epBadge"></span>
+        <span class="ep-badge threat-badge hidden" id="epThreatBadge"></span>
+      </div>
+      <div class="hdr-right">
+        <button class="btn btn-sm" id="btnCopyUrl" title="Copy Webhook URL">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy URL
+        </button>
+        <button class="btn btn-sm" id="btnPause">⏸ Pause</button>
+        <button class="btn btn-sm btn-danger" id="btnClear">🗑 Clear</button>
+        <button class="btn btn-sm btn-outline" id="btnEdit">⚙ Settings</button>
+      </div>
+    </div>
+
+    <div class="url-strip" id="urlStrip">
+      <span class="url-tag">WEBHOOK URL</span>
+      <code id="epUrl"></code>
+      <button class="btn-icon-sm" id="btnCopyUrl2" title="Copy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+      <button class="btn-icon-sm" id="btnRegenToken" title="Regenerate Token">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+    </div>
+
+    <div class="ep-kpis" id="epKpis"></div>
+
+    <div class="ep-body">
+      <!-- Left: request list -->
+      <div class="req-panel">
+        <div class="req-toolbar">
+          <input id="reqSearch" class="inp-sm" placeholder="Search…">
+          <select id="reqMethod" class="inp-sm">
+            <option value="">All</option>
+            <option>GET</option><option>POST</option><option>PUT</option>
+            <option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option>
+          </select>
+          <select id="reqFilter" class="inp-sm">
+            <option value="">All</option>
+            <option value="starred">⭐ Starred</option>
+            <option value="blocked">🚫 Blocked</option>
+            <option value="threats">⚠ Threats</option>
+          </select>
+          <span class="req-total" id="reqTotal">0</span>
+        </div>
+        <div id="reqList" class="req-list"></div>
+      </div>
+
+      <!-- Right: request detail -->
+      <div class="req-detail" id="reqDetail">
+        <div class="empty-state">
+          <div class="empty-icon">⚡</div>
+          <p>Waiting for requests…</p>
+          <p class="empty-sub">Send a request to your webhook URL to see it here in real-time</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── LIVE FEED ────────────────────────────────────────────────────────── -->
+  <section class="view" id="viewLive">
+    <div class="view-hdr">
+      <h1>Live Feed <span class="live-dot"></span></h1>
+      <div class="hdr-right">
+        <select id="liveFilter" class="inp-sm">
+          <option value="">All Endpoints</option>
+        </select>
+        <label class="toggle"><input type="checkbox" id="chkScroll" checked> Auto-scroll</label>
+        <button class="btn btn-sm" id="btnClearFeed">Clear</button>
+      </div>
+    </div>
+    <div class="live-stats" id="liveStats">
+      <div class="ls-item"><span class="ls-val" id="lsTotal">0</span><span class="ls-lbl">Total seen</span></div>
+      <div class="ls-item"><span class="ls-val" id="lsRpm">0</span><span class="ls-lbl">Req / min</span></div>
+      <div class="ls-item"><span class="ls-val" id="lsBlocked">0</span><span class="ls-lbl">Blocked</span></div>
+      <div class="ls-item"><span class="ls-val" id="lsThreats">0</span><span class="ls-lbl">Threats</span></div>
+    </div>
+    <canvas id="chartLiveActivity" height="80" style="padding:0 24px;flex-shrink:0"></canvas>
+    <div class="live-feed" id="liveFeed"></div>
+  </section>
+
+  <!-- ─── SECURITY ──────────────────────────────────────────────────────────── -->
+  <section class="view" id="viewSecurity">
+    <div class="view-hdr">
+      <h1>Security Center</h1>
+      <div class="hdr-right">
+        <button class="btn btn-sm" id="btnRefreshSec">Refresh</button>
+      </div>
+    </div>
+    <div class="kpi-row" id="secKpiRow"></div>
+    <div class="dash-grid">
+      <div class="card">
+        <div class="card-hdr"><h3>Events by Type (24h)</h3></div>
+        <canvas id="chartSecTypes" height="140"></canvas>
+      </div>
+      <div class="card span2">
+        <div class="card-hdr"><h3>Security Events Timeline</h3></div>
+        <canvas id="chartSecTimeline" height="140"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><h3>Top Attackers (24h)</h3></div>
+        <table class="dtable" id="topAttackersTable">
+          <thead><tr><th>IP</th><th>Events</th><th>Risk</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="card span2">
+        <div class="card-hdr"><h3>Recent Security Events</h3></div>
+        <div id="secEventFeed" style="max-height:300px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── API KEYS ───────────────────────────────────────────────────────────── -->
+  <section class="view" id="viewKeys">
+    <div class="view-hdr">
+      <h1>API Keys</h1>
+      <div class="hdr-right">
+        <button class="btn btn-primary btn-sm" id="btnCreateKey">+ New Key</button>
+      </div>
+    </div>
+    <div class="card" style="margin:20px 24px">
+      <div class="card-hdr"><h3>Active API Keys</h3></div>
+      <table class="dtable" id="apiKeysTable">
+        <thead><tr><th>Name</th><th>Prefix</th><th>Permissions</th><th>Created</th><th>Last Used</th><th>Actions</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="card" style="margin:0 24px">
+      <div class="card-hdr"><h3>Usage</h3></div>
+      <div style="padding:16px;font-family:var(--mono);font-size:12px;color:var(--txt2)">
+        Pass your API key in the <code style="color:var(--accent2)">X-Api-Key</code> header when making requests to the webhook tester API.<br><br>
+        <code style="display:block;background:var(--bg3);padding:10px;border-radius:6px;color:var(--code)">curl -H "X-Api-Key: wht_..." https://your-domain/api/endpoints</code>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══ MODALS ════════════════════════════════════════════════════════════════ -->
+<div class="overlay hidden" id="overlay">
+
+  <!-- Endpoint Create/Edit -->
+  <div class="modal hidden" id="modalEp">
+    <div class="modal-hdr">
+      <h2 id="modalEpTitle">New Endpoint</h2>
+      <button class="btn-icon" data-close="modalEp">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-tabs">
+        <button class="mtab active" data-mtab="basic">Basic</button>
+        <button class="mtab" data-mtab="response">Response</button>
+        <button class="mtab" data-mtab="security">Security</button>
+        <button class="mtab" data-mtab="limits">Limits</button>
+      </div>
+      <div id="modalEpContent"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-close="modalEp">Cancel</button>
+      <button class="btn btn-primary" id="btnSaveEp">Save Endpoint</button>
+    </div>
+  </div>
+
+  <!-- Request Detail -->
+  <div class="modal modal-xl hidden" id="modalReq">
+    <div class="modal-hdr">
+      <div class="req-modal-hdr">
+        <span id="rmMethod" class="method-badge"></span>
+        <span id="rmPath" class="rm-path"></span>
+        <span id="rmThreat" class="threat-pill hidden"></span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm" id="btnRmStar">☆ Star</button>
+        <button class="btn btn-sm" id="btnRmReplay">↺ Replay</button>
+        <button class="btn btn-icon" data-close="modalReq">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" style="padding:0;display:flex;flex-direction:column;overflow:hidden">
+      <div class="req-tabs" id="rmTabs">
+        <button class="req-tab active" data-tab="overview">Overview</button>
+        <button class="req-tab" data-tab="headers">Headers</button>
+        <button class="req-tab" data-tab="body">Body</button>
+        <button class="req-tab" data-tab="security">Security</button>
+        <button class="req-tab" data-tab="replay">Replay</button>
+        <button class="req-tab" data-tab="raw">Raw</button>
+        <button class="req-tab" data-tab="code">Export</button>
+      </div>
+      <div id="rmContent" class="rm-content"></div>
+    </div>
+    <div class="modal-footer">
+      <div class="export-row">
+        <span class="export-lbl">Export as:</span>
+        <button class="btn btn-xs btn-outline" data-export="curl">cURL</button>
+        <button class="btn btn-xs btn-outline" data-export="httpie">HTTPie</button>
+        <button class="btn btn-xs btn-outline" data-export="python">Python</button>
+        <button class="btn btn-xs btn-outline" data-export="node">Node</button>
+        <button class="btn btn-xs btn-outline" data-export="php">PHP</button>
+        <button class="btn btn-xs btn-outline" data-export="go">Go</button>
+        <button class="btn btn-xs btn-outline" data-export="json">JSON</button>
+      </div>
+      <button class="btn btn-sm btn-danger" id="btnRmDelete">Delete</button>
+    </div>
+  </div>
+
+  <!-- New API Key -->
+  <div class="modal modal-sm hidden" id="modalKey">
+    <div class="modal-hdr">
+      <h2>Create API Key</h2>
+      <button class="btn-icon" data-close="modalKey">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><label>Name</label><input class="fi" id="keyName" placeholder="My Integration"></div>
+      <div class="fg"><label>Permissions</label>
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <label class="toggle"><input type="checkbox" value="read" checked> Read</label>
+          <label class="toggle"><input type="checkbox" value="write" checked> Write</label>
+          <label class="toggle"><input type="checkbox" value="admin"> Admin</label>
+        </div>
+      </div>
+      <div id="keyResult" class="key-result hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" data-close="modalKey">Close</button>
+      <button class="btn btn-primary" id="btnDoCreateKey">Create Key</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toasts" class="toast-stack"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>
