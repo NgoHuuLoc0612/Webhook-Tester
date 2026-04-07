@@ -1,4 +1,4 @@
-# WebhookTester Enterprise v3.0
+# WebhookTester v3.0
 
 ## Project Structure
 
